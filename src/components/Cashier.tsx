@@ -53,10 +53,10 @@ export default function Cashier({ onBack }: { onBack?: () => void }) {
       const transaction = {
         menu_name: menuDescription,
         quantity: totalQty,
-        price: totalPrice / totalQty, // Harga rata-rata atau bisa diset 0 jika tidak relevan
-        total_price: totalPrice,
-        payment_amount: Number(paymentAmount),
-        change_amount: changeAmount,
+        price: Math.round(totalPrice / (totalQty || 1)), // Ensure it's an integer
+        total_price: Math.round(totalPrice),
+        payment_amount: Math.round(Number(paymentAmount)),
+        change_amount: Math.round(changeAmount),
         created_at: new Date().toISOString()
       };
 

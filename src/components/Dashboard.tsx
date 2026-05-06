@@ -70,6 +70,35 @@ export default function Dashboard({ onBack }: { onBack?: () => void }) {
     return [];
   }, [sales, selectedReport]);
 
+  // Grouped data for detailed views
+  const groupedDetailedData = useMemo(() => {
+    if (!selectedReport || selectedReport === 'today') return null;
+
+    const groups: Record<string, { date: string; label: string; total: number; count: number }> = {};
+    
+    filteredData.forEach(sale => {
+      const date = parseISO(sale.created_at);
+      let key = '';
+      let label = '';
+      
+      if (selectedReport === 'month') {
+        key = format(date, 'yyyy-MM-dd');
+        label = format(date, 'dd MMM yyyy', { locale: id });
+      } else if (selectedReport === 'year') {
+        key = format(date, 'yyyy-MM');
+        label = format(date, 'MMMM yyyy', { locale: id });
+      }
+
+      if (!groups[key]) {
+        groups[key] = { date: key, label, total: 0, count: 0 };
+      }
+      groups[key].total += sale.total_price;
+      groups[key].count += 1;
+    });
+
+    return Object.values(groups).sort((a, b) => b.date.localeCompare(a.date));
+  }, [filteredData, selectedReport]);
+
   const stats = useMemo(() => {
     const now = new Date();
     
@@ -127,10 +156,10 @@ export default function Dashboard({ onBack }: { onBack?: () => void }) {
     const dataToExport = selectedReport ? filteredData : sales;
     const total = dataToExport.reduce((acc, s) => acc + s.total_price, 0);
     
-    // Only include profit sharing for monthly reports or if specifically chosen
+    // Include profit sharing for monthly AND yearly reports as requested
     const summary = {
       total,
-      profitSharing: selectedReport === 'month' ? {
+      profitSharing: (selectedReport === 'month' || selectedReport === 'year') ? {
         modal: total * 0.5,
         pengelola: total * 0.3,
         pemilik: total * 0.2
@@ -341,12 +370,12 @@ export default function Dashboard({ onBack }: { onBack?: () => void }) {
         </>
       ) : (
         <div className="space-y-6">
-          {selectedReport === 'month' && (
+          {(selectedReport === 'month' || selectedReport === 'year') && (
             <Card className="shadow-sm border-amber-200 rounded-[2rem] overflow-hidden bg-amber-50/30">
               <CardHeader className="bg-amber-800 text-white p-6">
                 <CardTitle className="text-lg font-black uppercase tracking-widest flex items-center gap-2">
                   <DollarSign size={20} />
-                  Ringkasan Bagi Hasil (50/30/20)
+                  Ringkasan Bagi Hasil (50/30/20) - Laporan {selectedReport === 'month' ? 'Bulanan' : 'Tahunan'}
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-8">
@@ -368,7 +397,48 @@ export default function Dashboard({ onBack }: { onBack?: () => void }) {
             </Card>
           )}
 
+          {groupedDetailedData && (
+             <Card className="shadow-sm border-stone-100 rounded-[2.5rem] overflow-hidden bg-white mb-6">
+               <CardHeader className="p-6 border-b border-stone-50 bg-stone-50/30">
+                 <CardTitle className="text-sm font-black text-stone-600 uppercase tracking-widest">
+                   Breakdown {selectedReport === 'month' ? 'Harian' : 'Bulanan'}
+                 </CardTitle>
+               </CardHeader>
+               <div className="overflow-x-auto">
+                 <table className="w-full text-sm">
+                   <thead className="bg-stone-50/50 text-stone-400 uppercase text-[10px] font-black tracking-widest">
+                     <tr>
+                       <th className="px-6 py-4 text-left">{selectedReport === 'month' ? 'Tanggal' : 'Bulan'}</th>
+                       <th className="px-6 py-4 text-center">Jumlah Transaksi</th>
+                       <th className="px-6 py-4 text-right">Total Pendapatan</th>
+                       <th className="px-6 py-4 text-right">Modal (50%)</th>
+                       <th className="px-6 py-4 text-right">Bagi Hasil</th>
+                     </tr>
+                   </thead>
+                   <tbody className="divide-y divide-stone-50">
+                     {groupedDetailedData.map((item) => (
+                       <tr key={item.date} className="hover:bg-amber-50/30 transition-colors">
+                         <td className="px-6 py-4 font-black text-stone-800">{item.label}</td>
+                         <td className="px-6 py-4 text-center text-stone-500 font-bold">{item.count}</td>
+                         <td className="px-6 py-4 text-right font-black text-stone-900">Rp {item.total.toLocaleString('id-ID')}</td>
+                         <td className="px-6 py-4 text-right text-amber-800 font-bold">Rp {(item.total * 0.5).toLocaleString('id-ID')}</td>
+                         <td className="px-6 py-4 text-right text-stone-400 text-xs">
+                           P: Rp {(item.total * 0.3).toLocaleString('id-ID')} | O: Rp {(item.total * 0.2).toLocaleString('id-ID')}
+                         </td>
+                       </tr>
+                     ))}
+                   </tbody>
+                 </table>
+               </div>
+             </Card>
+          )}
+
           <Card className="shadow-sm border-stone-100 rounded-[2.5rem] overflow-hidden bg-white">
+            <CardHeader className="p-6 border-b border-stone-50 bg-stone-50/30">
+              <CardTitle className="text-sm font-black text-stone-600 uppercase tracking-widest">
+                Daftar Transaksi Rinci
+              </CardTitle>
+            </CardHeader>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-stone-50 text-stone-400 uppercase text-[10px] font-black tracking-widest">
